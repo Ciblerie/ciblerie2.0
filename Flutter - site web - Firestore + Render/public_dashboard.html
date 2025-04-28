@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tableau de Bord</title>
+    <style>
+        body {
+            background: linear-gradient(135deg, #1d4ed8, #2563eb);
+            font-family: Arial, sans-serif;
+            color: #fff;
+            text-align: center;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 5px 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+        }
+
+        header h1 {
+            font-size: 20px;
+        }
+
+        table {
+            margin: auto;
+            width: 80%;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 10px;
+            border: none;
+            text-align: center;
+        }
+
+        th {
+            background: rgba(255, 255, 255, 0.3);
+            font-size: 16px;
+        }
+
+        td {
+            font-size: 14px;
+        }
+
+        /* Équilibrage des colonnes */
+        .position, .days-in-rank, .best-rank, .small-date {
+            width: 15%; /* Largeur équilibrée pour ces colonnes */
+        }
+
+        .pseudo {
+            width: 25%; /* Maintien de la largeur pour "Pseudo" */
+        }
+
+        .score {
+            width: 25%; /* Maintien de la largeur pour "Score" */
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>🔧 Tableau de Bord</h1>
+</header>
+<main>
+    <h2>🏆 Classement des joueurs</h2>
+    <table>
+        <thead>
+        <tr>
+            <th class="position">Position</th>
+            <th class="days-in-rank">Jours dans le rang</th>
+            <th class="best-rank">Meilleure place</th>
+            <th class="small-date">Date</th>
+            <th class="pseudo">Pseudo</th>
+            <th class="score">Score</th>
+        </tr>
+        </thead>
+        <tbody id="scoreTableBody">
+        <!-- Les lignes seront ajoutées ici dynamiquement -->
+        </tbody>
+    </table>
+</main>
+<script>
+    const apiUrl = "/scores"; // Endpoint API pour récupérer les scores
+    let currentScores = []; // Stocke les scores actuels pour détecter les changements
+    const playerStats = {}; // Stocke les statistiques des joueurs (jours dans le rang, meilleure place)
+
+    async function loadScores() {
+        try {
+            const response = await fetch(apiUrl);
+            const data = await response.json();
+
+            // Trier les scores par ordre décroissant
+            data.sort((a, b) => b.score - a.score);
+
+            // Vérifie si les scores ont changé avant d'actualiser
+            if (JSON.stringify(data) !== JSON.stringify(currentScores)) {
+                currentScores = data; // Met à jour les scores actuels
+                const tbody = document.getElementById("scoreTableBody");
+                tbody.innerHTML = ""; // Efface les anciennes lignes
+
+                const today = new Date().toISOString().split('T')[0]; // Date au format YYYY-MM-DD
+
+                data.forEach((entry, index) => {
+                    const row = document.createElement("tr");
+
+                    // Formatage de la date
+                    const date = new Intl.DateTimeFormat("fr-FR", {
+                        timeZone: "Europe/Paris",
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    }).format(new Date(entry.timestamp));
+
+                    // Mettre à jour les statistiques du joueur
+                    if (!playerStats[entry.pseudo]) {
+                        playerStats[entry.pseudo] = {
+                            bestRank: index + 1,
+                            daysInRank: 1,
+                            lastUpdated: today,
+                        };
+                    } else {
+                        // Meilleure place
+                        playerStats[entry.pseudo].bestRank = Math.min(
+                            playerStats[entry.pseudo].bestRank,
+                            index + 1
+                        );
+
+                        // Jours dans le rang
+                        if (playerStats[entry.pseudo].lastUpdated !== today) {
+                            playerStats[entry.pseudo].daysInRank += 1;
+                            playerStats[entry.pseudo].lastUpdated = today;
+                        }
+                    }
+
+                    // Ajouter une ligne au tableau
+                    row.innerHTML = `
+                        <td class="position">${index + 1}</td>
+                        <td class="days-in-rank">${playerStats[entry.pseudo].daysInRank || '-'}</td>
+                        <td class="best-rank">${playerStats[entry.pseudo].bestRank || '-'}</td>
+                        <td class="small-date">${date}</td>
+                        <td class="pseudo">${entry.pseudo || 'Anonyme'}</td>
+                        <td class="score">${entry.score}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+        } catch (error) {
+            console.error("Erreur lors du chargement des scores :", error);
+        }
+    }
+
+    // Actualisation automatique toutes les 5 secondes
+    setInterval(loadScores, 5000);
+
+    // Charge automatiquement au démarrage
+    loadScores();
+</script>
+</body>
+</html>
